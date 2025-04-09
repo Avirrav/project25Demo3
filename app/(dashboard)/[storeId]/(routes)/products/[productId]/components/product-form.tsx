@@ -2,7 +2,7 @@
 
 import * as z from 'zod';
 import axios from 'axios';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Category, Color, Image, Product, Size } from '@prisma/client';
 import { Trash } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -33,16 +33,32 @@ import { toast } from 'react-hot-toast';
 import { AlertModal } from '@/components/modals/alert-modal';
 import ImageUpload from '@/components/ui/image-upload';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
 
 const formSchema = z.object({
   name: z.string().min(1),
+  description: z.string().min(1),
   images: z.object({ url: z.string() }).array(),
-  price: z.coerce.number().min(1),
+  costPerItem: z.coerce.number().min(0),
+  profitMargin: z.coerce.number().min(0),
+  gstRate: z.coerce.number().min(0),
+  vatRate: z.coerce.number().min(0),
+  customTaxRate: z.coerce.number().min(0),
+  price: z.coerce.number().min(0),
+  sku: z.string().min(1),
+  stockQuantity: z.coerce.number().min(0),
+  sellWhenOutOfStock: z.boolean().default(false),
+  requiresShipping: z.boolean().default(true),
+  weight: z.coerce.number().optional(),
+  weightUnit: z.string().optional(),
+  length: z.coerce.number().optional(),
+  width: z.coerce.number().optional(),
+  height: z.coerce.number().optional(),
   categoryId: z.string().min(1),
   colorId: z.string().min(1),
   sizeId: z.string().min(1),
-  isFeatured: z.boolean().default(false).optional(),
-  isArchived: z.boolean().default(false).optional(),
+  isFeatured: z.boolean().default(false),
+  isArchived: z.boolean().default(false),
 });
 
 type ProductFormValues = z.infer<typeof formSchema>;
@@ -51,9 +67,17 @@ interface ProductFormProps {
   initialData:
     | (Product & {
         images: Image[];
+        costPerItem?: number;
+        profitMargin?: number;
+        gstRate?: number;
+        vatRate?: number;
+        customTaxRate?: number;
+        weight?: number;
+        length?: number;
+        width?: number;
+        height?: number;
       })
     | null;
-
   categories: Category[];
   sizes: Size[];
   colors: Color[];
@@ -78,11 +102,38 @@ export const ProductForm = ({
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: initialData
-      ? { ...initialData, price: parseFloat(String(initialData?.price)) }
+      ? {
+          ...initialData,
+          price: parseFloat(String(initialData?.price)),
+          costPerItem: parseFloat(String(initialData?.costPerItem)),
+          profitMargin: parseFloat(String(initialData?.profitMargin)),
+          gstRate: parseFloat(String(initialData?.gstRate)),
+          vatRate: parseFloat(String(initialData?.vatRate)),
+          customTaxRate: parseFloat(String(initialData?.customTaxRate)),
+          weight: initialData?.weight ? parseFloat(String(initialData.weight)) : undefined,
+          length: initialData?.length ? parseFloat(String(initialData.length)) : undefined,
+          width: initialData?.width ? parseFloat(String(initialData.width)) : undefined,
+          height: initialData?.height ? parseFloat(String(initialData.height)) : undefined,
+        }
       : {
           name: '',
+          description: '',
           images: [],
           price: 0,
+          costPerItem: 0,
+          profitMargin: 0,
+          gstRate: 0,
+          vatRate: 0,
+          customTaxRate: 0,
+          sku: '',
+          stockQuantity: 0,
+          sellWhenOutOfStock: false,
+          requiresShipping: true,
+          weight: undefined,
+          weightUnit: 'kg',
+          length: undefined,
+          width: undefined,
+          height: undefined,
           categoryId: '',
           colorId: '',
           sizeId: '',
@@ -90,6 +141,23 @@ export const ProductForm = ({
           isArchived: false,
         },
   });
+
+  // Calculate total price when cost or tax rates change
+  useEffect(() => {
+    const costPerItem = Number(form.getValues('costPerItem')) || 0;
+    const profitMargin = Number(form.getValues('profitMargin')) || 0;
+    const gstRate = Number(form.getValues('gstRate')) || 0;
+    const vatRate = Number(form.getValues('vatRate')) || 0;
+    const customTaxRate = Number(form.getValues('customTaxRate')) || 0;
+
+    const profit = (costPerItem * profitMargin) / 100;
+    const gst = (costPerItem * gstRate) / 100;
+    const vat = (costPerItem * vatRate) / 100;
+    const customTax = (costPerItem * customTaxRate) / 100;
+
+    const totalPrice = Number((costPerItem + profit + gst + vat + customTax).toFixed(2));
+    form.setValue('price', totalPrice);
+  }, [form.watch('costPerItem'), form.watch('profitMargin'), form.watch('gstRate'), form.watch('vatRate'), form.watch('customTaxRate')]);
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
@@ -106,7 +174,7 @@ export const ProductForm = ({
       router.push(`/${params.storeId}/products`);
       toast.success(toastMessage);
     } catch (error) {
-      toast.error('something went wrong');
+      toast.error('Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -120,7 +188,7 @@ export const ProductForm = ({
       router.push(`/${params.storeId}/products`);
       toast.success('Product deleted.');
     } catch (error) {
-      toast.error('something went wrong');
+      toast.error('Something went wrong');
     } finally {
       setLoading(false);
       setOpen(false);
@@ -188,7 +256,131 @@ export const ProductForm = ({
                   <FormControl>
                     <Input
                       disabled={loading}
-                      placeholder='Product Name'
+                      placeholder='Product name'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='description'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      disabled={loading}
+                      placeholder='Product description'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='sku'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SKU</FormLabel>
+                  <FormControl>
+                    <Input
+                      disabled={loading}
+                      placeholder='SKU'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='costPerItem'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cost Per Item</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      placeholder='9.99'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='profitMargin'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profit Margin (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      placeholder='20'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='gstRate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>GST Rate (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      placeholder='18'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='vatRate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>VAT Rate (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      placeholder='5'
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='customTaxRate'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Custom Tax Rate (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      placeholder='0'
                       {...field}
                     />
                   </FormControl>
@@ -201,12 +393,28 @@ export const ProductForm = ({
               name='price'
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price</FormLabel>
+                  <FormLabel>Total Price</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={true}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='stockQuantity'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Stock Quantity</FormLabel>
                   <FormControl>
                     <Input
                       type='number'
                       disabled={loading}
-                      placeholder='9.99'
                       {...field}
                     />
                   </FormControl>
@@ -230,7 +438,7 @@ export const ProductForm = ({
                       <SelectTrigger>
                         <SelectValue
                           defaultValue={field.value}
-                          placeholder='select a category'
+                          placeholder='Select a category'
                         />
                       </SelectTrigger>
                     </FormControl>
@@ -262,7 +470,7 @@ export const ProductForm = ({
                       <SelectTrigger>
                         <SelectValue
                           defaultValue={field.value}
-                          placeholder='select a size'
+                          placeholder='Select a size'
                         />
                       </SelectTrigger>
                     </FormControl>
@@ -294,7 +502,7 @@ export const ProductForm = ({
                       <SelectTrigger>
                         <SelectValue
                           defaultValue={field.value}
-                          placeholder='select a color '
+                          placeholder='Select a color'
                         />
                       </SelectTrigger>
                     </FormControl>
@@ -312,20 +520,130 @@ export const ProductForm = ({
             />
             <FormField
               control={form.control}
+              name='weightUnit'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Weight Unit</FormLabel>
+                  <Select
+                    disabled={loading}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue
+                          defaultValue={field.value}
+                          placeholder='Select unit'
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="g">Grams (g)</SelectItem>
+                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                      <SelectItem value="lbs">Pounds (lbs)</SelectItem>
+                      <SelectItem value="oz">Ounces (oz)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='weight'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Weight</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      {...field}
+                      value={field.value || ''}
+                      onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className='grid grid-cols-3 gap-8'>
+            <FormField
+              control={form.control}
+              name='length'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Length</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      {...field}
+                      value={field.value || ''}
+                      onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='width'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Width</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      {...field}
+                      value={field.value || ''}
+                      onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='height'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Height</FormLabel>
+                  <FormControl>
+                    <Input
+                      type='number'
+                      disabled={loading}
+                      {...field}
+                      value={field.value || ''}
+                      onChange={e => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className='grid grid-cols-3 gap-8'>
+            <FormField
+              control={form.control}
               name='isFeatured'
               render={({ field }) => (
                 <FormItem className='flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4'>
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      //@ts-ignore
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
                   <div className='space-y-1 leading-none'>
                     <FormLabel>Featured</FormLabel>
                     <FormDescription>
-                      This product will appear on the home page.
+                      Featured products will appear on the home page
                     </FormDescription>
                   </div>
                 </FormItem>
@@ -339,14 +657,53 @@ export const ProductForm = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      //@ts-ignore
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
                   <div className='space-y-1 leading-none'>
                     <FormLabel>Archived</FormLabel>
                     <FormDescription>
-                      This product will not appear anywhere in the store.
+                      Archived products will not appear in the store
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='sellWhenOutOfStock'
+              render={({ field }) => (
+                <FormItem className='flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4'>
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className='space-y-1 leading-none'>
+                    <FormLabel>Continue selling when out of stock</FormLabel>
+                    <FormDescription>
+                      Allow customers to purchase even when stock is 0
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='requiresShipping'
+              render={({ field }) => (
+                <FormItem className='flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4'>
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className='space-y-1 leading-none'>
+                    <FormLabel>Requires shipping</FormLabel>
+                    <FormDescription>
+                      This product needs to be shipped
                     </FormDescription>
                   </div>
                 </FormItem>
