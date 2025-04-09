@@ -4,7 +4,7 @@ import * as z from 'zod';
 import axios from 'axios';
 import { useState, useEffect } from 'react';
 import { Category, Color, Image, Product, Size } from '@prisma/client';
-import { Trash } from 'lucide-react';
+import { Trash, Plus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useParams, useRouter } from 'next/navigation';
@@ -35,15 +35,17 @@ import ImageUpload from '@/components/ui/image-upload';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 
+interface Tax {
+  name: string;
+  value: number;
+}
+
 const formSchema = z.object({
   name: z.string().min(1),
   description: z.string().min(1),
   images: z.object({ url: z.string() }).array(),
   costPerItem: z.coerce.number().min(0),
   profitMargin: z.coerce.number().min(0),
-  gstRate: z.coerce.number().min(0),
-  vatRate: z.coerce.number().min(0),
-  customTaxRate: z.coerce.number().min(0),
   price: z.coerce.number().min(0),
   sku: z.string().min(1),
   stockQuantity: z.coerce.number().min(0),
@@ -69,9 +71,6 @@ interface ProductFormProps {
         images: Image[];
         costPerItem?: number;
         profitMargin?: number;
-        gstRate?: number;
-        vatRate?: number;
-        customTaxRate?: number;
         weight?: number;
         length?: number;
         width?: number;
@@ -93,6 +92,11 @@ export const ProductForm = ({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [taxes, setTaxes] = useState<Tax[]>(
+    initialData?.taxes ? JSON.parse(initialData.taxes as string) : []
+  );
+  const [newTaxName, setNewTaxName] = useState('');
+  const [newTaxValue, setNewTaxValue] = useState('');
 
   const title = initialData ? 'Edit product' : 'Create product';
   const description = initialData ? 'Edit a product' : 'Add a new product';
@@ -107,9 +111,6 @@ export const ProductForm = ({
           price: parseFloat(String(initialData?.price)),
           costPerItem: parseFloat(String(initialData?.costPerItem)),
           profitMargin: parseFloat(String(initialData?.profitMargin)),
-          gstRate: parseFloat(String(initialData?.gstRate)),
-          vatRate: parseFloat(String(initialData?.vatRate)),
-          customTaxRate: parseFloat(String(initialData?.customTaxRate)),
           weight: initialData?.weight ? parseFloat(String(initialData.weight)) : undefined,
           length: initialData?.length ? parseFloat(String(initialData.length)) : undefined,
           width: initialData?.width ? parseFloat(String(initialData.width)) : undefined,
@@ -122,9 +123,6 @@ export const ProductForm = ({
           price: 0,
           costPerItem: 0,
           profitMargin: 0,
-          gstRate: 0,
-          vatRate: 0,
-          customTaxRate: 0,
           sku: '',
           stockQuantity: 0,
           sellWhenOutOfStock: false,
@@ -142,22 +140,38 @@ export const ProductForm = ({
         },
   });
 
-  // Calculate total price when cost or tax rates change
+  const addTax = () => {
+    if (newTaxName && newTaxValue) {
+      const newTax = {
+        name: newTaxName,
+        value: parseFloat(newTaxValue),
+      };
+      setTaxes([...taxes, newTax]);
+      setNewTaxName('');
+      setNewTaxValue('');
+    }
+  };
+
+  const removeTax = (index: number) => {
+    const newTaxes = taxes.filter((_, i) => i !== index);
+    setTaxes(newTaxes);
+  };
+
+  // Calculate total price when cost, profit margin or taxes change
   useEffect(() => {
     const costPerItem = Number(form.getValues('costPerItem')) || 0;
     const profitMargin = Number(form.getValues('profitMargin')) || 0;
-    const gstRate = Number(form.getValues('gstRate')) || 0;
-    const vatRate = Number(form.getValues('vatRate')) || 0;
-    const customTaxRate = Number(form.getValues('customTaxRate')) || 0;
-
+    
     const profit = (costPerItem * profitMargin) / 100;
-    const gst = (costPerItem * gstRate) / 100;
-    const vat = (costPerItem * vatRate) / 100;
-    const customTax = (costPerItem * customTaxRate) / 100;
+    const basePrice = costPerItem + profit;
+    
+    const totalTax = taxes.reduce((acc, tax) => {
+      return acc + (basePrice * tax.value) / 100;
+    }, 0);
 
-    const totalPrice = Number((costPerItem + profit + gst + vat + customTax).toFixed(2));
+    const totalPrice = Number((basePrice + totalTax).toFixed(2));
     form.setValue('price', totalPrice);
-  }, [form.watch('costPerItem'), form.watch('profitMargin'), form.watch('gstRate'), form.watch('vatRate'), form.watch('customTaxRate')]);
+  }, [form.watch('costPerItem'), form.watch('profitMargin'), taxes]);
 
   const onSubmit = async (data: ProductFormValues) => {
     try {
@@ -165,10 +179,16 @@ export const ProductForm = ({
       if (initialData) {
         await axios.patch(
           `/api/${params.storeId}/products/${params.productId}`,
-          data
+          {
+            ...data,
+            taxes: JSON.stringify(taxes)
+          }
         );
       } else {
-        await axios.post(`/api/${params.storeId}/products`, data);
+        await axios.post(`/api/${params.storeId}/products`, {
+          ...data,
+          taxes: JSON.stringify(taxes)
+        });
       }
       router.refresh();
       router.push(`/${params.storeId}/products`);
@@ -334,60 +354,46 @@ export const ProductForm = ({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name='gstRate'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>GST Rate (%)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      disabled={loading}
-                      placeholder='18'
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='vatRate'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>VAT Rate (%)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      disabled={loading}
-                      placeholder='5'
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name='customTaxRate'
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Custom Tax Rate (%)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type='number'
-                      disabled={loading}
-                      placeholder='0'
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div>
+              <FormLabel>Custom Taxes</FormLabel>
+              <div className="space-y-4">
+                <div className="flex space-x-2">
+                  <Input
+                    placeholder="Tax name"
+                    value={newTaxName}
+                    onChange={(e) => setNewTaxName(e.target.value)}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Tax value (%)"
+                    value={newTaxValue}
+                    onChange={(e) => setNewTaxValue(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    onClick={addTax}
+                    variant="secondary"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {taxes.map((tax, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      {tax.name}: {tax.value}%
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => removeTax(index)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
             <FormField
               control={form.control}
               name='price'

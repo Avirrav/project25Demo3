@@ -17,9 +17,7 @@ export async function POST(
       price,
       costPerItem,
       profitMargin,
-      gstRate,
-      vatRate,
-      customTaxRate,
+      taxes,
       sku,
       stockQuantity,
       sellWhenOutOfStock,
@@ -92,6 +90,8 @@ export async function POST(
       },
     });
 
+    
+
     if (!storByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
@@ -103,9 +103,7 @@ export async function POST(
         price,
         costPerItem,
         profitMargin: profitMargin || 0,
-        gstRate: gstRate || 0,
-        vatRate: vatRate || 0,
-        customTaxRate: customTaxRate || 0,
+        taxes,
         sku,
         stockQuantity,
         sellWhenOutOfStock: sellWhenOutOfStock || false,

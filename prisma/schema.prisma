@@ -61,9 +61,7 @@ model Product {
   price       Decimal
   costPerItem Decimal
   profitMargin Decimal  @default(0)
-  gstRate     Decimal   @default(0)
-  vatRate     Decimal   @default(0)
-  customTaxRate Decimal @default(0)
+  taxes       Json      @default("[]")
   sku         String    @unique
   stockQuantity Int     @default(0)
   sellWhenOutOfStock Boolean @default(false)
