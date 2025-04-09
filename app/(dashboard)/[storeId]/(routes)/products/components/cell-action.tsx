@@ -1,21 +1,19 @@
 'use client';
 
 import axios from 'axios';
-import { Copy, Edit, MoreHorizontal, Trash } from 'lucide-react';
+import { useState } from 'react';
+import { Copy, Edit, MoreHorizontal, Trash, Eye } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useParams, useRouter } from 'next/navigation';
 
-import { useState } from 'react';
-
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
-  DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-
-import { Button } from '@/components/ui/button';
 
 import { ProductColumn } from './columns';
 import { AlertModal } from '@/components/modals/alert-modal';
@@ -25,9 +23,7 @@ interface CellActionProps {
 }
 export const CellAction = ({ data }: CellActionProps) => {
   const router = useRouter();
-
   const params = useParams();
-
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -50,6 +46,10 @@ export const CellAction = ({ data }: CellActionProps) => {
     }
   };
 
+  const onView = () => {
+    window.open(`/${params.storeId}/products/${data.id}/view`, '_blank');
+  };
+
   return (
     <>
       <AlertModal
@@ -70,6 +70,10 @@ export const CellAction = ({ data }: CellActionProps) => {
           <DropdownMenuItem onClick={() => onCopy(data.id)}>
             <Copy className='mr-2 h-4 w-4' />
             Copy Id
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onView()}>
+            <Eye className='mr-2 h-4 w-4' />
+            View
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
