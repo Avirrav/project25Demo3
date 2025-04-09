@@ -44,3 +44,5 @@ const ProductViewPage = async ({
     </div>
   );
 };
+
+export default ProductViewPage;
