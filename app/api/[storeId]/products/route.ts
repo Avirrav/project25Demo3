@@ -13,7 +13,22 @@ export async function POST(
 
     const {
       name,
+      description,
       price,
+      costPerItem,
+      profitMargin,
+      gstRate,
+      vatRate,
+      customTaxRate,
+      sku,
+      stockQuantity,
+      sellWhenOutOfStock,
+      requiresShipping,
+      weight,
+      weightUnit,
+      length,
+      width,
+      height,
       categoryId,
       colorId,
       sizeId,
@@ -30,12 +45,28 @@ export async function POST(
       return new NextResponse('Name is required', { status: 400 });
     }
 
+    if (!description) {
+      return new NextResponse('Description is required', { status: 400 });
+    }
+
     if (!images || !images.length) {
       return new NextResponse('Images are required', { status: 400 });
     }
 
     if (!price) {
-      return new NextResponse('Price Url is required', { status: 400 });
+      return new NextResponse('Price is required', { status: 400 });
+    }
+
+    if (!costPerItem) {
+      return new NextResponse('Cost per item is required', { status: 400 });
+    }
+
+    if (!sku) {
+      return new NextResponse('SKU is required', { status: 400 });
+    }
+
+    if (typeof stockQuantity !== 'number') {
+      return new NextResponse('Stock quantity is required', { status: 400 });
     }
 
     if (!categoryId) {
@@ -62,18 +93,33 @@ export async function POST(
     });
 
     if (!storByUserId) {
-      return new NextResponse('Unautorized', { status: 405 });
+      return new NextResponse('Unauthorized', { status: 405 });
     }
 
     const product = await prismadb.product.create({
       data: {
         name,
+        description,
         price,
+        costPerItem,
+        profitMargin: profitMargin || 0,
+        gstRate: gstRate || 0,
+        vatRate: vatRate || 0,
+        customTaxRate: customTaxRate || 0,
+        sku,
+        stockQuantity,
+        sellWhenOutOfStock: sellWhenOutOfStock || false,
+        requiresShipping: requiresShipping ?? true,
+        weight,
+        weightUnit,
+        length,
+        width,
+        height,
         categoryId,
         colorId,
         sizeId,
-        isFeatured,
-        isArchived,
+        isFeatured: isFeatured || false,
+        isArchived: isArchived || false,
         storeId: params.storeId,
         images: {
           createMany: {
