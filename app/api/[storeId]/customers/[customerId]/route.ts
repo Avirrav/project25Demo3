@@ -23,7 +23,7 @@ export async function GET(
     console.log('[CUSTOMER_GET]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function PATCH(
   req: Request,
@@ -41,10 +41,6 @@ export async function PATCH(
 
     if (!fullName) {
       return new NextResponse("Full name is required", { status: 400 });
-    }
-
-    if (!email) {
-      return new NextResponse("Email is required", { status: 400 });
     }
 
     if (!phone) {
@@ -76,7 +72,7 @@ export async function PATCH(
       },
       data: {
         fullName,
-        email,
+        email: email || "",
         phone,
         shippingAddress
       }
@@ -87,7 +83,7 @@ export async function PATCH(
     console.log('[CUSTOMER_PATCH]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function DELETE(
   req: Request,
@@ -126,4 +122,4 @@ export async function DELETE(
     console.log('[CUSTOMER_DELETE]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}

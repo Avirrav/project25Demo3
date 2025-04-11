@@ -21,10 +21,6 @@ export async function POST(
       return new NextResponse("Full name is required", { status: 400 });
     }
 
-    if (!email) {
-      return new NextResponse("Email is required", { status: 400 });
-    }
-
     if (!phone) {
       return new NextResponse("Phone is required", { status: 400 });
     }
@@ -51,7 +47,7 @@ export async function POST(
     const customer = await prismadb.customer.create({
       data: {
         fullName,
-        email,
+        email: email || "",
         phone,
         shippingAddress,
         storeId: params.storeId,
@@ -63,7 +59,7 @@ export async function POST(
     console.log('[CUSTOMERS_POST]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function GET(
   req: Request,
@@ -88,4 +84,4 @@ export async function GET(
     console.log('[CUSTOMERS_GET]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}

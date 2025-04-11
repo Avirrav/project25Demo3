@@ -23,13 +23,12 @@ model Store {
   updatedAt       DateTime   @updatedAt
 }
 
-// Add Customer model
 model Customer {
   id              String    @id @default(uuid())
   storeId         String
   store           Store     @relation("StoreToCustomer", fields: [storeId], references: [id])
   fullName        String
-  email           String
+  email           String    @default("")
   phone           String
   shippingAddress String    @db.Text
   orders          Order[]   @relation("CustomerToOrder")

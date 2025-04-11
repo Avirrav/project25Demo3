@@ -23,13 +23,24 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Heading } from '@/components/ui/heading';
 import { AlertModal } from '@/components/modals/alert-modal';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const formSchema = z.object({
-  fullName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().min(1),
-  shippingAddress: z.string().min(1),
+  fullName: z.string().min(1, "Full name is required"),
+  phone: z.string().min(1, "Phone number is required"),
+  email: z.string().email().optional().or(z.literal('')),
+  addressLine1: z.string().min(1, "Address Line 1 is required"),
+  addressLine2: z.string().optional(),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State/Province/Region is required"),
+  postalCode: z.string().min(1, "Postal/ZIP code is required"),
+  country: z.string().min(1, "Country is required"),
 });
 
 type CustomerFormValues = z.infer<typeof formSchema>;
@@ -37,6 +48,12 @@ type CustomerFormValues = z.infer<typeof formSchema>;
 interface CustomerFormProps {
   initialData: Customer | null;
 }
+
+const countries = [
+  "United States", "Canada", "United Kingdom", "Australia", "Germany", 
+  "France", "Italy", "Spain", "Japan", "China", "India", "Brazil",
+  // Add more countries as needed
+];
 
 export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
   const params = useParams();
@@ -50,23 +67,72 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
   const toastMessage = initialData ? 'Customer updated.' : 'Customer created.';
   const action = initialData ? 'Save changes' : 'Create';
 
+  // Parse the shipping address from JSON if it exists
+  let defaultAddressValues = {
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: 'United States' // Default country
+  };
+
+  if (initialData?.shippingAddress) {
+    try {
+      const parsedAddress = JSON.parse(initialData.shippingAddress);
+      defaultAddressValues = {
+        addressLine1: parsedAddress.addressLine1 || '',
+        addressLine2: parsedAddress.addressLine2 || '',
+        city: parsedAddress.city || '',
+        state: parsedAddress.state || '',
+        postalCode: parsedAddress.postalCode || '',
+        country: parsedAddress.country || 'United States'
+      };
+    } catch (e) {
+      console.error('Error parsing shipping address:', e);
+    }
+  }
+
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialData || {
+    defaultValues: initialData ? {
+      fullName: initialData.fullName,
+      email: initialData.email,
+      phone: initialData.phone,
+      ...defaultAddressValues
+    } : {
       fullName: '',
       email: '',
       phone: '',
-      shippingAddress: '',
-    },
+      ...defaultAddressValues
+    }
   });
 
   const onSubmit = async (data: CustomerFormValues) => {
     try {
       setLoading(true);
+      
+      // Combine address fields into a single JSON string
+      const shippingAddress = JSON.stringify({
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+        city: data.city,
+        state: data.state,
+        postalCode: data.postalCode,
+        country: data.country
+      });
+
+      const submitData = {
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
+        shippingAddress
+      };
+
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/customers/${params.customerId}`, data);
+        await axios.patch(`/api/${params.storeId}/customers/${params.customerId}`, submitData);
       } else {
-        await axios.post(`/api/${params.storeId}/customers`, data);
+        await axios.post(`/api/${params.storeId}/customers`, submitData);
       }
       router.refresh();
       router.push(`/${params.storeId}/customers`);
@@ -117,7 +183,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
       <Separator />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 w-full">
-          <div className="grid grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <FormField
               control={form.control}
               name="fullName"
@@ -125,20 +191,7 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
                 <FormItem>
                   <FormLabel>Full Name</FormLabel>
                   <FormControl>
-                    <Input disabled={loading} placeholder="Customer name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input disabled={loading} placeholder="Email address" {...field} />
+                    <Input disabled={loading} placeholder="Full Name" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -149,9 +202,9 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Phone</FormLabel>
+                  <FormLabel>Phone Number</FormLabel>
                   <FormControl>
-                    <Input disabled={loading} placeholder="Phone number" {...field} />
+                    <Input disabled={loading} placeholder="Phone Number" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -159,17 +212,115 @@ export const CustomerForm: React.FC<CustomerFormProps> = ({ initialData }) => {
             />
             <FormField
               control={form.control}
-              name="shippingAddress"
+              name="email"
               render={({ field }) => (
-                <FormItem className="col-span-3">
-                  <FormLabel>Shipping Address</FormLabel>
+                <FormItem>
+                  <FormLabel>Email Address (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Input disabled={loading} placeholder="Email Address" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="addressLine1"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address Line 1</FormLabel>
+                  <FormControl>
+                    <Input 
                       disabled={loading} 
-                      placeholder="Enter shipping address" 
+                      placeholder="Street, House No, etc." 
                       {...field} 
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="addressLine2"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Address Line 2 (Optional)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      disabled={loading} 
+                      placeholder="Landmark, Apartment, etc." 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="city"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl>
+                    <Input disabled={loading} placeholder="City" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="state"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>State / Province / Region</FormLabel>
+                  <FormControl>
+                    <Input disabled={loading} placeholder="State" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="postalCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Postal / ZIP Code</FormLabel>
+                  <FormControl>
+                    <Input disabled={loading} placeholder="Postal Code" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="country"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Country</FormLabel>
+                  <Select
+                    disabled={loading}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue defaultValue={field.value} placeholder="Select a country" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {countries.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
