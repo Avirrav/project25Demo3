@@ -18,8 +18,25 @@ model Store {
   sizes           Size[]     @relation("StoreToSize")
   colors          Color[]     @relation("StoreToColor")
   orders          Order[]     @relation("StoreToOrder")
+  customers       Customer[]  @relation("StoreToCustomer")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+}
+
+// Add Customer model
+model Customer {
+  id              String    @id @default(uuid())
+  storeId         String
+  store           Store     @relation("StoreToCustomer", fields: [storeId], references: [id])
+  fullName        String
+  email           String
+  phone           String
+  shippingAddress String    @db.Text
+  orders          Order[]   @relation("CustomerToOrder")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([storeId])
 }
 
 model Billboard {
@@ -91,8 +108,10 @@ model Product {
 
 model Order {
   id        String    @id @default(uuid())
-  storeId     String    
-  store       Store     @relation("StoreToOrder", fields: [storeId], references: [id])
+  storeId   String    
+  store     Store     @relation("StoreToOrder", fields: [storeId], references: [id])
+  customerId String?  
+  customer  Customer? @relation("CustomerToOrder", fields: [customerId], references: [id])
   orderItems OrderItem[] 
   isPaid     Boolean   @default(false)
   phone      String    @default("")
@@ -101,6 +120,7 @@ model Order {
   updatedAt DateTime  @updatedAt
 
   @@index([storeId])
+  @@index([customerId])
 }
 
 model OrderItem {
