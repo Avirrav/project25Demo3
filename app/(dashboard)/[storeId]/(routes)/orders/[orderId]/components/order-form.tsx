@@ -2,7 +2,7 @@
 
 import * as z from 'zod';
 import axios from 'axios';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Order, OrderItem, Product, Customer } from '@prisma/client';
 import { Trash } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -33,11 +33,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 
 const formSchema = z.object({
-  // Customer Type Selection
   customerType: z.enum(['existing', 'guest']),
   customerId: z.string().optional(),
-  
-  // Guest Customer Information
   fullName: z.string().min(1, "Full name is required").optional(),
   phone: z.string().min(1, "Phone number is required"),
   email: z.string().email().optional(),
@@ -47,19 +44,12 @@ const formSchema = z.object({
   state: z.string().min(1, "State is required"),
   postalCode: z.string().min(1, "Postal code is required"),
   country: z.string().min(1, "Country is required"),
-  
-  // Order Details
   productIds: z.array(z.string()).min(1, "At least one product must be selected"),
   quantities: z.record(z.string(), z.number().min(1)),
-  
-  // Payment Details
   paymentStatus: z.enum(['paid', 'pending', 'partial']),
   paymentMethod: z.enum(['cash', 'credit_card', 'upi', 'bank_transfer', 'other']),
   amountPaid: z.number().min(0),
-  
-  // Order Status
   orderStatus: z.enum(['draft', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned']),
-  
   isPaid: z.boolean().default(false),
 });
 
@@ -105,7 +95,6 @@ const COUNTRIES = [
   "France",
   "India",
   "Japan",
-  // Add more countries as needed
 ];
 
 export const OrderForm: React.FC<OrderFormProps> = ({
@@ -131,12 +120,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     productIds: initialData.orderItems.map(item => item.productId),
     quantities: initialData.orderItems.reduce((acc, item) => ({
       ...acc,
-      [item.productId]: 1
+      [item.productId]: item.quantity
     }), {}),
-    paymentStatus: 'pending' as const,
-    paymentMethod: 'cash' as const,
-    amountPaid: 0,
-    orderStatus: 'draft' as const,
+    paymentStatus: initialData.paymentStatus as any,
+    paymentMethod: initialData.paymentMethod as any,
+    amountPaid: Number(initialData.amountPaid),
+    orderStatus: initialData.orderStatus as any,
     isPaid: initialData.isPaid
   } : {
     customerType: 'guest' as const,
@@ -160,6 +149,34 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     resolver: zodResolver(formSchema),
     defaultValues
   });
+
+  // Watch for payment status changes
+  useEffect(() => {
+    const paymentStatus = form.watch('paymentStatus');
+    if (paymentStatus === 'paid') {
+      form.setValue('isPaid', true);
+    }
+  }, [form.watch('paymentStatus')]);
+
+  // Handle customer selection
+  const handleCustomerSelect = (customerId: string) => {
+    const selectedCustomer = customers.find(c => c.id === customerId);
+    if (selectedCustomer) {
+      try {
+        const address = JSON.parse(selectedCustomer.shippingAddress);
+        form.setValue('phone', selectedCustomer.phone);
+        form.setValue('email', selectedCustomer.email);
+        form.setValue('addressLine1', address.addressLine1);
+        form.setValue('addressLine2', address.addressLine2 || '');
+        form.setValue('city', address.city);
+        form.setValue('state', address.state);
+        form.setValue('postalCode', address.postalCode);
+        form.setValue('country', address.country);
+      } catch (error) {
+        console.error('Error parsing customer address:', error);
+      }
+    }
+  };
 
   const onSubmit = async (data: OrderFormValues) => {
     try {
@@ -259,7 +276,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                     <FormLabel>Select Customer</FormLabel>
                     <Select
                       disabled={loading}
-                      onValueChange={field.onChange}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        handleCustomerSelect(value);
+                      }}
                       value={field.value}
                       defaultValue={field.value}
                     >
@@ -469,33 +489,64 @@ export const OrderForm: React.FC<OrderFormProps> = ({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Products</FormLabel>
-                  <div className="grid gap-2">
-                    {products.map((product) => (
-                      <div key={product.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          checked={field.value?.includes(product.id)}
-                          onCheckedChange={(checked) => {
-                            const updatedIds = checked
-                              ? [...(field.value || []), product.id]
-                              : field.value?.filter((id) => id !== product.id) || [];
-                            field.onChange(updatedIds);
-                          }}
-                        />
-                        <span>{product.name} - ${product.price.toString()}</span>
-                        {field.value?.includes(product.id) && (
+                  <Select
+                    disabled={loading}
+                    onValueChange={(value) => {
+                      const currentIds = field.value || [];
+                      const newIds = currentIds.includes(value)
+                        ? currentIds.filter(id => id !== value)
+                        : [...currentIds, value];
+                      field.onChange(newIds);
+                      
+                      // Initialize quantity if not exists
+                      if (!currentIds.includes(value)) {
+                        form.setValue(`quantities.${value}`, 1);
+                      }
+                    }}
+                    value={field.value?.[0] || ''}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select products" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} - ${product.price.toString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="mt-4 space-y-2">
+                    {field.value?.map((productId) => {
+                      const product = products.find(p => p.id === productId);
+                      return product ? (
+                        <div key={productId} className="flex items-center gap-2">
+                          <span>{product.name}</span>
                           <Input
                             type="number"
                             min="1"
-                            placeholder="Quantity"
-                            value={form.watch(`quantities.${product.id}`) || 1}
-                            onChange={(e) => {
-                              form.setValue(`quantities.${product.id}`, parseInt(e.target.value) || 1);
-                            }}
                             className="w-24"
+                            value={form.watch(`quantities.${productId}`) || 1}
+                            onChange={(e) => {
+                              form.setValue(`quantities.${productId}`, parseInt(e.target.value) || 1);
+                            }}
                           />
-                        )}
-                      </div>
-                    ))}
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              const newIds = field.value?.filter(id => id !== productId) || [];
+                              field.onChange(newIds);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ) : null;
+                    })}
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -511,7 +562,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Payment Status</FormLabel>
                   <Select
                     disabled={loading}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value === 'paid') {
+                        form.setValue('isPaid', true);
+                      }
+                    }}
                     value={field.value}
                     defaultValue={field.value}
                   >

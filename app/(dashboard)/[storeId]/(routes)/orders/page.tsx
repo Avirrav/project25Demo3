@@ -36,6 +36,8 @@ const OrdersPage = async ({ params }: { params: { storeId: string } }) => {
       }, 0)
     ),
     isPaid: item.isPaid,
+    paymentStatus: item.paymentStatus,
+    orderStatus: item.orderStatus,
     createdAt: format(item.createdAt, 'MMMM do, yyyy'),
   }));
 
