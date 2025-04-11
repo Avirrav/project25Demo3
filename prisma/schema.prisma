@@ -1,3 +1,6 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -38,6 +41,40 @@ model Customer {
   @@index([storeId])
 }
 
+model Order {
+  id              String    @id @default(uuid())
+  storeId         String    
+  store           Store     @relation("StoreToOrder", fields: [storeId], references: [id])
+  customerId      String?  
+  customer        Customer? @relation("CustomerToOrder", fields: [customerId], references: [id])
+  orderItems      OrderItem[] 
+  isPaid          Boolean   @default(false)
+  phone           String    @default("")
+  email           String?
+  address         String    @default("")
+  paymentStatus   String    @default("pending")
+  paymentMethod   String    @default("cash")
+  amountPaid      Decimal   @default(0)
+  orderStatus     String    @default("draft")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([storeId])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String  
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
 model Billboard {
   id          String @id @default(uuid())
   storeId     String
@@ -75,18 +112,6 @@ model Product {
   name        String
   description String    @db.Text
   price       Decimal
-  costPerItem Decimal
-  profitMargin Decimal  @default(0)
-  taxes       Json      @default("[]")
-  sku         String    @unique
-  stockQuantity Int     @default(0)
-  sellWhenOutOfStock Boolean @default(false)
-  requiresShipping Boolean @default(true)
-  weight      Decimal?
-  weightUnit  String?
-  length      Decimal?
-  width       Decimal?
-  height      Decimal?
   isFeatured  Boolean   @default(false)
   isArchived  Boolean   @default(false)
   sizeId      String    
@@ -102,35 +127,6 @@ model Product {
   @@index([categoryId])
   @@index([sizeId])
   @@index([colorId])
-  @@index([sku])
-}
-
-model Order {
-  id        String    @id @default(uuid())
-  storeId   String    
-  store     Store     @relation("StoreToOrder", fields: [storeId], references: [id])
-  customerId String?  
-  customer  Customer? @relation("CustomerToOrder", fields: [customerId], references: [id])
-  orderItems OrderItem[] 
-  isPaid     Boolean   @default(false)
-  phone      String    @default("")
-  address    String    @default("")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([storeId])
-  @@index([customerId])
-}
-
-model OrderItem {
-  id        String  @id @default(uuid())
-  orderId   String  
-  order     Order   @relation(fields: [orderId], references: [id])
-  productId String  
-  product   Product @relation(fields: [productId], references: [id])
-
-  @@index([orderId])
-  @@index([productId])
 }
 
 model Size {

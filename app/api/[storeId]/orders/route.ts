@@ -11,22 +11,29 @@ export async function POST(
     const { userId } = auth();
     const body = await req.json();
 
-    const { phone, address, isPaid, productIds } = body;
+    const {
+      customerType,
+      customerId,
+      fullName,
+      email,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      country,
+      productIds,
+      quantities,
+      paymentStatus,
+      paymentMethod,
+      amountPaid,
+      orderStatus,
+      isPaid
+    } = body;
 
     if (!userId) {
       return new NextResponse("Unauthenticated", { status: 403 });
-    }
-
-    if (!phone) {
-      return new NextResponse("Phone is required", { status: 400 });
-    }
-
-    if (!address) {
-      return new NextResponse("Address is required", { status: 400 });
-    }
-
-    if (!productIds || !productIds.length) {
-      return new NextResponse("Product ids are required", { status: 400 });
     }
 
     if (!params.storeId) {
@@ -44,19 +51,52 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 405 });
     }
 
+    // Prepare the shipping address
+    const shippingAddress = JSON.stringify({
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      country
+    });
+
+    // Create or get customer
+    let finalCustomerId = customerId;
+    if (customerType === 'guest' && fullName) {
+      const customer = await prismadb.customer.create({
+        data: {
+          storeId: params.storeId,
+          fullName,
+          email: email || '',
+          phone,
+          shippingAddress
+        }
+      });
+      finalCustomerId = customer.id;
+    }
+
+    // Create the order
     const order = await prismadb.order.create({
       data: {
         storeId: params.storeId,
+        customerId: finalCustomerId,
         phone,
-        address,
+        email,
+        address: addressLine1, // Store the primary address in the order
+        paymentStatus,
+        paymentMethod,
+        amountPaid,
+        orderStatus,
         isPaid,
         orderItems: {
-          create: productIds.map((productId: string) => ({
+          create: Object.entries(quantities).map(([productId, quantity]) => ({
             product: {
               connect: {
                 id: productId
               }
-            }
+            },
+            quantity
           }))
         }
       }
@@ -67,7 +107,7 @@ export async function POST(
     console.log('[ORDERS_POST]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function GET(
   req: Request,
@@ -76,6 +116,7 @@ export async function GET(
   try {
     const { searchParams } = new URL(req.url);
     const isPaid = searchParams.get('isPaid');
+    const status = searchParams.get('status');
 
     if (!params.storeId) {
       return new NextResponse("Store id is required", { status: 400 });
@@ -84,14 +125,16 @@ export async function GET(
     const orders = await prismadb.order.findMany({
       where: {
         storeId: params.storeId,
-        isPaid: isPaid ? true : undefined
+        isPaid: isPaid ? true : undefined,
+        orderStatus: status || undefined
       },
       include: {
         orderItems: {
           include: {
             product: true
           }
-        }
+        },
+        customer: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -103,4 +146,4 @@ export async function GET(
     console.log('[ORDERS_GET]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}

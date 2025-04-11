@@ -17,7 +17,12 @@ export async function GET(
         id: params.orderId
       },
       include: {
-        orderItems: true
+        orderItems: {
+          include: {
+            product: true
+          }
+        },
+        customer: true
       }
     });
   
@@ -26,7 +31,7 @@ export async function GET(
     console.log('[ORDER_GET]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function PATCH(
   req: Request,
@@ -36,22 +41,33 @@ export async function PATCH(
     const { userId } = auth();
     const body = await req.json();
 
-    const { phone, address, isPaid, productIds } = body;
+    const {
+      customerType,
+      customerId,
+      fullName,
+      email,
+      phone,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      country,
+      productIds,
+      quantities,
+      paymentStatus,
+      paymentMethod,
+      amountPaid,
+      orderStatus,
+      isPaid
+    } = body;
 
     if (!userId) {
       return new NextResponse("Unauthenticated", { status: 403 });
     }
 
-    if (!phone) {
-      return new NextResponse("Phone is required", { status: 400 });
-    }
-
-    if (!address) {
-      return new NextResponse("Address is required", { status: 400 });
-    }
-
-    if (!productIds || !productIds.length) {
-      return new NextResponse("Product ids are required", { status: 400 });
+    if (!params.orderId) {
+      return new NextResponse("Order id is required", { status: 400 });
     }
 
     const storeByUserId = await prismadb.store.findFirst({
@@ -65,22 +81,55 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 405 });
     }
 
+    // Prepare the shipping address
+    const shippingAddress = JSON.stringify({
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      postalCode,
+      country
+    });
+
+    // Update or create customer if it's a guest
+    let finalCustomerId = customerId;
+    if (customerType === 'guest' && fullName) {
+      const customer = await prismadb.customer.create({
+        data: {
+          storeId: params.storeId,
+          fullName,
+          email: email || '',
+          phone,
+          shippingAddress
+        }
+      });
+      finalCustomerId = customer.id;
+    }
+
+    // Update the order
     await prismadb.order.update({
       where: {
         id: params.orderId
       },
       data: {
+        customerId: finalCustomerId,
         phone,
-        address,
+        email,
+        address: addressLine1, // Store the primary address in the order
+        paymentStatus,
+        paymentMethod,
+        amountPaid,
+        orderStatus,
         isPaid,
         orderItems: {
           deleteMany: {},
-          create: productIds.map((productId: string) => ({
+          create: Object.entries(quantities).map(([productId, quantity]) => ({
             product: {
               connect: {
                 id: productId
               }
-            }
+            },
+            quantity
           }))
         }
       }
@@ -91,7 +140,7 @@ export async function PATCH(
     console.log('[ORDER_PATCH]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
 
 export async function DELETE(
   req: Request,
@@ -130,4 +179,4 @@ export async function DELETE(
     console.log('[ORDER_DELETE]', error);
     return new NextResponse("Internal error", { status: 500 });
   }
-};
+}
