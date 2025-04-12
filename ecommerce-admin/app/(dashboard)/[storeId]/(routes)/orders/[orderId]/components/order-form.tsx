@@ -32,14 +32,15 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
+// Updated form schema to make some fields optional based on customer type
 const formSchema = z.object({
   customerType: z.enum(['existing', 'guest']),
   customerId: z.string().optional(),
-  fullName: z.string().min(1, "Full name is required").optional(),
+  fullName: z.string().optional(),
   phone: z.string().min(1, "Phone number is required"),
-  email: z.string().email().optional(),
+  email: z.string().email().optional().or(z.literal('')),
   addressLine1: z.string().min(1, "Address Line 1 is required"),
-  addressLine2: z.string().optional(),
+  addressLine2: z.string().optional().or(z.literal('')),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
   postalCode: z.string().min(1, "Postal code is required"),
@@ -51,13 +52,28 @@ const formSchema = z.object({
   amountPaid: z.number().min(0),
   orderStatus: z.enum(['draft', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned']),
   isPaid: z.boolean().default(false),
+}).refine((data) => {
+  // Validate that if customerType is 'guest', fullName is provided
+  if (data.customerType === 'guest' && !data.fullName) {
+    return false;
+  }
+  // Validate that if customerType is 'existing', customerId is provided
+  if (data.customerType === 'existing' && !data.customerId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Required fields are missing",
+  path: ["customerType"]
 });
 
 type OrderFormValues = z.infer<typeof formSchema>;
 
 interface OrderFormProps {
   initialData: Order & {
-    orderItems: OrderItem[]
+    orderItems: (OrderItem & {
+      product: Product;
+    })[];
   } | null;
   products: Product[];
   customers: Customer[];
@@ -112,43 +128,90 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const toastMessage = initialData ? 'Order updated.' : 'Order created.';
   const action = initialData ? 'Save changes' : 'Create';
 
-  const defaultValues = initialData ? {
-    customerType: 'existing' as const,
-    customerId: initialData.customerId || undefined,
-    phone: initialData.phone,
-    addressLine1: initialData.address,
-    productIds: initialData.orderItems.map(item => item.productId),
-    quantities: initialData.orderItems.reduce((acc, item) => ({
-      ...acc,
-      [item.productId]: item.quantity
-    }), {}),
-    paymentStatus: initialData.paymentStatus as any,
-    paymentMethod: initialData.paymentMethod as any,
-    amountPaid: Number(initialData.amountPaid),
-    orderStatus: initialData.orderStatus as any,
-    isPaid: initialData.isPaid
-  } : {
-    customerType: 'guest' as const,
-    phone: '',
-    addressLine1: '',
-    addressLine2: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: 'United States',
-    productIds: [],
-    quantities: {},
-    paymentStatus: 'pending' as const,
-    paymentMethod: 'cash' as const,
-    amountPaid: 0,
-    orderStatus: 'draft' as const,
-    isPaid: false
+  // Calculate initial values for the form
+  const getInitialValues = () => {
+    if (initialData) {
+      const customerData = initialData.customerId ? customers.find(c => c.id === initialData.customerId) : null;
+      let address = { addressLine1: '', addressLine2: '', city: '', state: '', postalCode: '', country: 'United States' };
+      
+      if (customerData?.shippingAddress) {
+        try {
+          address = JSON.parse(customerData.shippingAddress);
+        } catch (e) {
+          console.error('Error parsing shipping address:', e);
+        }
+      }
+
+      const quantities = {};
+      initialData.orderItems.forEach(item => {
+        quantities[item.productId] = item.quantity;
+      });
+
+      return {
+        customerType: initialData.customerId ? 'existing' as const : 'guest' as const,
+        customerId: initialData.customerId || undefined,
+        fullName: customerData?.fullName || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        addressLine1: address.addressLine1 || initialData.address,
+        addressLine2: address.addressLine2 || '',
+        city: address.city || '',
+        state: address.state || '',
+        postalCode: address.postalCode || '',
+        country: address.country || 'United States',
+        productIds: initialData.orderItems.map(item => item.productId),
+        quantities,
+        paymentStatus: initialData.paymentStatus as any,
+        paymentMethod: initialData.paymentMethod as any,
+        amountPaid: Number(initialData.amountPaid),
+        orderStatus: initialData.orderStatus as any,
+        isPaid: initialData.isPaid
+      };
+    }
+
+    return {
+      customerType: 'guest' as const,
+      fullName: '',
+      email: '',
+      phone: '',
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      postalCode: '',
+      country: 'United States',
+      productIds: [],
+      quantities: {},
+      paymentStatus: 'pending' as const,
+      paymentMethod: 'cash' as const,
+      amountPaid: 0,
+      orderStatus: 'draft' as const,
+      isPaid: false
+    };
   };
 
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues
+    defaultValues: getInitialValues()
   });
+
+  // Calculate total price based on selected products and quantities
+  const calculateTotalPrice = () => {
+    const selectedProducts = form.watch('productIds');
+    const quantities = form.watch('quantities');
+    
+    return selectedProducts.reduce((total, productId) => {
+      const product = products.find(p => p.id === productId);
+      const quantity = quantities[productId] || 0;
+      return total + (product ? Number(product.price) * quantity : 0);
+    }, 0);
+  };
+
+  // Update amount paid when products or quantities change
+  useEffect(() => {
+    const totalPrice = calculateTotalPrice();
+    form.setValue('amountPaid', totalPrice);
+  }, [form.watch('productIds'), form.watch('quantities')]);
 
   // Watch for payment status changes
   useEffect(() => {
@@ -181,16 +244,41 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const onSubmit = async (data: OrderFormValues) => {
     try {
       setLoading(true);
+      
+      // Prepare the shipping address
+      const shippingAddress = JSON.stringify({
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+        city: data.city,
+        state: data.state,
+        postalCode: data.postalCode,
+        country: data.country
+      });
+
+      const submitData = {
+        ...data,
+        shippingAddress,
+        // Ensure these fields are included
+        phone: data.phone,
+        email: data.email || '',
+        address: data.addressLine1, // Store the primary address
+      };
+
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/orders/${params.orderId}`, data);
+        await axios.patch(`/api/${params.storeId}/orders/${params.orderId}`, {
+          ...submitData,
+          orderStatus: data.orderStatus // Only allow updating order status
+        });
       } else {
-        await axios.post(`/api/${params.storeId}/orders`, data);
+        await axios.post(`/api/${params.storeId}/orders`, submitData);
       }
+      
       router.refresh();
       router.push(`/${params.storeId}/orders`);
       toast.success(toastMessage);
     } catch (error: any) {
-      toast.error('Something went wrong.');
+      console.error('Order submission error:', error);
+      toast.error('Failed to save order. Please check all required fields.');
     } finally {
       setLoading(false);
     }
@@ -210,8 +298,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       setOpen(false);
     }
   };
-
-  const customerType = form.watch('customerType');
 
   return (
     <>
@@ -246,7 +332,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Customer Type</FormLabel>
                   <Select
-                    disabled={loading}
+                    disabled={loading || !!initialData}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -267,7 +353,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             />
 
             {/* Existing Customer Selection */}
-            {customerType === 'existing' && (
+            {form.watch('customerType') === 'existing' && (
               <FormField
                 control={form.control}
                 name="customerId"
@@ -275,7 +361,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormItem>
                     <FormLabel>Select Customer</FormLabel>
                     <Select
-                      disabled={loading}
+                      disabled={loading || !!initialData}
                       onValueChange={(value) => {
                         field.onChange(value);
                         handleCustomerSelect(value);
@@ -303,7 +389,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
             )}
 
             {/* Guest Customer Information */}
-            {customerType === 'guest' && (
+            {form.watch('customerType') === 'guest' && !initialData && (
               <>
                 <FormField
                   control={form.control}
@@ -313,7 +399,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
                         <Input 
-                          disabled={loading} 
+                          disabled={loading || !!initialData} 
                           placeholder="Customer's full name" 
                           {...field} 
                         />
@@ -330,7 +416,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                       <FormLabel>Email (Optional)</FormLabel>
                       <FormControl>
                         <Input 
-                          disabled={loading} 
+                          disabled={loading || !!initialData} 
                           placeholder="Email address" 
                           type="email"
                           {...field} 
@@ -352,7 +438,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="Phone number" 
                       {...field} 
                     />
@@ -370,7 +456,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Address Line 1</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="Street address" 
                       {...field} 
                     />
@@ -388,7 +474,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Address Line 2 (Optional)</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="Apartment, suite, etc." 
                       {...field} 
                     />
@@ -406,7 +492,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>City</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="City" 
                       {...field} 
                     />
@@ -424,7 +510,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>State/Province</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="State or province" 
                       {...field} 
                     />
@@ -442,7 +528,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Postal/ZIP Code</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading} 
+                      disabled={loading || !!initialData} 
                       placeholder="Postal or ZIP code" 
                       {...field} 
                     />
@@ -459,7 +545,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Country</FormLabel>
                   <Select
-                    disabled={loading}
+                    disabled={loading || !!initialData}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -490,7 +576,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Products</FormLabel>
                   <Select
-                    disabled={loading}
+                    disabled={loading || !!initialData}
                     onValueChange={(value) => {
                       const currentIds = field.value || [];
                       const newIds = currentIds.includes(value)
@@ -528,6 +614,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             type="number"
                             min="1"
                             className="w-24"
+                            disabled={loading || !!initialData}
                             value={form.watch(`quantities.${productId}`) || 1}
                             onChange={(e) => {
                               form.setValue(`quantities.${productId}`, parseInt(e.target.value) || 1);
@@ -537,6 +624,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             type="button"
                             variant="destructive"
                             size="sm"
+                            disabled={loading || !!initialData}
                             onClick={() => {
                               const newIds = field.value?.filter(id => id !== productId) || [];
                               field.onChange(newIds);
@@ -561,7 +649,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Payment Status</FormLabel>
                   <Select
-                    disabled={loading}
+                    disabled={loading || !!initialData}
                     onValueChange={(value) => {
                       field.onChange(value);
                       if (value === 'paid') {
@@ -596,7 +684,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Payment Method</FormLabel>
                   <Select
-                    disabled={loading}
+                    disabled={loading || !!initialData}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -628,7 +716,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormControl>
                     <Input 
                       type="number"
-                      disabled={loading} 
+                      disabled={true} 
                       placeholder="0.00" 
                       {...field}
                       onChange={e => field.onChange(parseFloat(e.target.value))}
@@ -678,6 +766,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
+                      disabled={loading || !!initialData}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
@@ -697,4 +786,4 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       </Form>
     </>
   );
-};
+}; 
