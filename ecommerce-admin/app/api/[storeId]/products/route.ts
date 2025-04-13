@@ -94,6 +94,18 @@ export async function POST(
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
+    // Check if SKU already exists using findFirst instead of findUnique
+    const existingSku = await prismadb.product.findFirst({
+      where: {
+        sku: sku,
+        storeId: params.storeId
+      }
+    });
+
+    if (existingSku) {
+      return new NextResponse('SKU already exists in this store', { status: 400 });
+    }
+
     const product = await prismadb.product.create({
       data: {
         name,

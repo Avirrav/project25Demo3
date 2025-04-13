@@ -111,19 +111,19 @@ model Product {
   category          Category  @relation("CategoryToProduct", fields: [categoryId], references: [id])
   name              String
   description       String    @db.Text
-  price             Decimal
-  costPerItem       Decimal   @default(0)
-  profitMargin      Decimal   @default(0)
+  price             Decimal   @db.Decimal(10, 2)
+  costPerItem       Decimal   @db.Decimal(10, 2) @default(0)
+  profitMargin      Decimal   @db.Decimal(10, 2) @default(0)
   taxes             String?   @db.Text
-  sku               String
+  sku               String    @unique
   stockQuantity     Int       @default(0)
   sellWhenOutOfStock Boolean  @default(false)
   requiresShipping  Boolean   @default(true)
-  weight            Decimal?
-  weightUnit        String?
-  length            Decimal?
-  width             Decimal?
-  height            Decimal?
+  weight            Decimal?  @db.Decimal(10, 2)
+  weightUnit        String?   @default("kg")
+  length            Decimal?  @db.Decimal(10, 2)
+  width             Decimal?  @db.Decimal(10, 2)
+  height            Decimal?  @db.Decimal(10, 2)
   isFeatured        Boolean   @default(false)
   isArchived        Boolean   @default(false)
   sizeId            String    

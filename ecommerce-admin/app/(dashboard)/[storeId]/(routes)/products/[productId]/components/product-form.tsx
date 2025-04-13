@@ -209,7 +209,8 @@ export const ProductForm = ({
       const { hasOrders } = response.data;
 
       if (hasOrders) {
-        toast.error('Cannot delete product with existing orders');
+        toast.error('Cannot delete product with existing orders. Instead Archive the Product to hide it.');
+        
         return;
       }
 
