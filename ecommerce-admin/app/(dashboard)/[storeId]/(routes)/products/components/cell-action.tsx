@@ -2,7 +2,7 @@
 
 import axios from 'axios';
 import { useState } from 'react';
-import { Copy, Edit, MoreHorizontal, Trash, Eye } from 'lucide-react';
+import { Copy, Edit, MoreHorizontal, Trash, Eye, Archive, ArchiveRestore } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -21,6 +21,7 @@ import { AlertModal } from '@/components/modals/alert-modal';
 interface CellActionProps {
   data: ProductColumn;
 }
+
 export const CellAction = ({ data }: CellActionProps) => {
   const router = useRouter();
   const params = useParams();
@@ -32,6 +33,22 @@ export const CellAction = ({ data }: CellActionProps) => {
     toast.success('Product id copied to clipboard');
   };
 
+  const onArchive = async () => {
+    try {
+      setLoading(true);
+      await axios.patch(`/api/${params.storeId}/products/${data.id}`, {
+        ...data,
+        isArchived: !data.isArchived
+      });
+      router.refresh();
+      toast.success(data.isArchived ? 'Product unarchived.' : 'Product archived.');
+    } catch (error) {
+      toast.error('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onDelete = async () => {
     try {
       setLoading(true);
@@ -39,7 +56,7 @@ export const CellAction = ({ data }: CellActionProps) => {
       router.refresh();
       toast.success('Product deleted.');
     } catch (error) {
-      toast.error('something went wrong');
+      toast.error('Something went wrong');
     } finally {
       setLoading(false);
       setOpen(false);
@@ -82,6 +99,19 @@ export const CellAction = ({ data }: CellActionProps) => {
           >
             <Edit className='mr-2 h-4 w-4' />
             Update
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onArchive}>
+            {data.isArchived ? (
+              <>
+                <ArchiveRestore className='mr-2 h-4 w-4' />
+                Unarchive
+              </>
+            ) : (
+              <>
+                <Archive className='mr-2 h-4 w-4' />
+                Archive
+              </>
+            )}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setOpen(true)}>
             <Trash className='mr-2 h-4 w-4' />

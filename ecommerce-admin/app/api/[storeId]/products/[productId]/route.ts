@@ -95,34 +95,23 @@ export async function PATCH(
       images,
       isFeatured,
       isArchived,
+      description,
+      costPerItem,
+      profitMargin,
+      taxes,
+      sku,
+      stockQuantity,
+      sellWhenOutOfStock,
+      requiresShipping,
+      weight,
+      weightUnit,
+      length,
+      width,
+      height,
     } = body;
 
     if (!userId) {
       return new NextResponse('Unauthenticated', { status: 403 });
-    }
-
-    if (!name) {
-      return new NextResponse('Name is required', { status: 400 });
-    }
-
-    if (!images || !images.length) {
-      return new NextResponse('Images are required', { status: 400 });
-    }
-
-    if (!price) {
-      return new NextResponse('Price Url is required', { status: 400 });
-    }
-
-    if (!categoryId) {
-      return new NextResponse('Category id is required', { status: 400 });
-    }
-
-    if (!colorId) {
-      return new NextResponse('Color id is required', { status: 400 });
-    }
-
-    if (!sizeId) {
-      return new NextResponse('Size id is required', { status: 400 });
     }
 
     if (!params.productId) {
@@ -140,34 +129,46 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    await prismadb.product.update({
+    // First, delete existing images
+    await prismadb.image.deleteMany({
       where: {
-        id: params.productId,
-      },
-      data: {
-        name,
-        price,
-        categoryId,
-        colorId,
-        sizeId,
-        images: {
-          deleteMany: {},
-        },
-        isFeatured,
-        isArchived,
-      },
+        productId: params.productId
+      }
     });
 
+    // Then update the product with new data
     const product = await prismadb.product.update({
       where: {
         id: params.productId,
       },
       data: {
+        name,
+        description,
+        price,
+        categoryId,
+        colorId,
+        sizeId,
+        costPerItem,
+        profitMargin,
+        taxes,
+        sku,
+        stockQuantity,
+        sellWhenOutOfStock,
+        requiresShipping,
+        weight,
+        weightUnit,
+        length,
+        width,
+        height,
         images: {
           createMany: {
-            data: [...images.map((image: { url: string }) => image)],
-          },
+            data: images.map((image: { url: string }) => ({
+              url: image.url
+            }))
+          }
         },
+        isFeatured,
+        isArchived,
       },
     });
 
