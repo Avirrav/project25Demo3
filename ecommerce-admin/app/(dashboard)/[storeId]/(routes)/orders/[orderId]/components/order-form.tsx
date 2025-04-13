@@ -192,11 +192,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
   // Update payment status when total price changes
   useEffect(() => {
-    const totalPrice = calculateTotalPrice();
-    if (form.watch('paymentStatus') === 'paid') {
+    const paymentStatus = form.watch('paymentStatus');
+    if (paymentStatus === 'paid') {
       form.setValue('isPaid', true);
+    } else {
+      form.setValue('isPaid', false);
     }
-  }, [form.watch('productIds'), form.watch('quantities'), form.watch('paymentStatus')]);
+  }, [form.watch('paymentStatus')]);
 
   // Handle customer selection
   const handleCustomerSelect = (customerId: string) => {
@@ -308,7 +310,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Customer Type</FormLabel>
                   <Select
-                    disabled={loading || !!initialData}
+                    disabled={loading}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -337,7 +339,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormItem>
                     <FormLabel>Select Customer</FormLabel>
                     <Select
-                      disabled={loading || !!initialData}
+                      disabled={loading}
                       onValueChange={(value) => {
                         field.onChange(value);
                         handleCustomerSelect(value);
@@ -375,7 +377,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
                         <Input 
-                          disabled={loading || !!initialData} 
+                          disabled={loading} 
                           placeholder="Customer's full name" 
                           {...field} 
                         />
@@ -392,7 +394,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                       <FormLabel>Email (Optional)</FormLabel>
                       <FormControl>
                         <Input 
-                          disabled={loading || !!initialData} 
+                          disabled={loading} 
                           placeholder="Email address" 
                           type="email"
                           {...field} 
@@ -414,7 +416,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="Phone number" 
                       {...field} 
                     />
@@ -432,7 +434,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Address Line 1</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="Street address" 
                       {...field} 
                     />
@@ -450,7 +452,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Address Line 2 (Optional)</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="Apartment, suite, etc." 
                       {...field} 
                     />
@@ -468,7 +470,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>City</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="City" 
                       {...field} 
                     />
@@ -486,7 +488,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>State/Province</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="State or province" 
                       {...field} 
                     />
@@ -504,7 +506,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormLabel>Postal/ZIP Code</FormLabel>
                   <FormControl>
                     <Input 
-                      disabled={loading || !!initialData} 
+                      disabled={loading} 
                       placeholder="Postal or ZIP code" 
                       {...field} 
                     />
@@ -521,7 +523,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Country</FormLabel>
                   <Select
-                    disabled={loading || !!initialData}
+                    disabled={loading}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -552,7 +554,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Products</FormLabel>
                   <Select
-                    disabled={loading || !!initialData}
+                    disabled={loading}
                     onValueChange={(value) => {
                       const currentIds = field.value || [];
                       const newIds = currentIds.includes(value)
@@ -590,7 +592,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             type="number"
                             min="1"
                             className="w-24"
-                            disabled={loading || !!initialData}
+                            disabled={loading}
                             value={form.watch(`quantities.${productId}`) || 1}
                             onChange={(e) => {
                               form.setValue(`quantities.${productId}`, parseInt(e.target.value) || 1);
@@ -600,7 +602,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                             type="button"
                             variant="destructive"
                             size="sm"
-                            disabled={loading || !!initialData}
+                            disabled={loading}
                             onClick={() => {
                               const newIds = field.value?.filter(id => id !== productId) || [];
                               field.onChange(newIds);
@@ -721,7 +723,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                   <FormControl>
                     <Checkbox
                       checked={field.value}
-                      disabled={loading || !!initialData}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
@@ -747,4 +748,5 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     </>
   );
 };
+
 export default OrderForm;
