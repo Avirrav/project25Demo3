@@ -244,10 +244,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       };
 
       if (initialData) {
-        await axios.patch(`/api/${params.storeId}/orders/${params.orderId}`, {
-          ...submitData,
-          orderStatus: data.orderStatus // Only allow updating order status
-        });
+        await axios.patch(`/api/${params.storeId}/orders/${params.orderId}`, submitData);
       } else {
         await axios.post(`/api/${params.storeId}/orders`, submitData);
       }
@@ -302,7 +299,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       <Separator />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 w-full">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Customer Type Selection */}
             <FormField
               control={form.control}
@@ -628,7 +625,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Payment Status</FormLabel>
                   <Select
-                    disabled={loading || !!initialData}
+                    disabled={loading}
                     onValueChange={(value) => {
                       field.onChange(value);
                       if (value === 'paid') {
@@ -663,7 +660,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 <FormItem>
                   <FormLabel>Payment Method</FormLabel>
                   <Select
-                    disabled={loading || !!initialData}
+                    disabled={loading}
                     onValueChange={field.onChange}
                     value={field.value}
                     defaultValue={field.value}
@@ -750,3 +747,4 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     </>
   );
 };
+export default OrderForm;

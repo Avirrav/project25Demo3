@@ -93,7 +93,7 @@ export const ProductForm = ({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [taxes, setTaxes] = useState<Tax[]>(
-    initialData?.taxes ? JSON.parse(initialData.taxes as string) : []
+    initialData?.taxes ? JSON.parse(initialData.taxes) : []
   );
   const [newTaxName, setNewTaxName] = useState('');
   const [newTaxValue, setNewTaxValue] = useState('');
