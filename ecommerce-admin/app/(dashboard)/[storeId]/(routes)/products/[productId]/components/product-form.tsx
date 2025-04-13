@@ -203,12 +203,26 @@ export const ProductForm = ({
   const onDelete = async () => {
     try {
       setLoading(true);
+      
+      // First check if the product has any orders
+      const response = await axios.get(`/api/${params.storeId}/products/${params.productId}/check-orders`);
+      const { hasOrders } = response.data;
+
+      if (hasOrders) {
+        toast.error('Cannot delete product with existing orders');
+        return;
+      }
+
       await axios.delete(`/api/${params.storeId}/products/${params.productId}`);
       router.refresh();
       router.push(`/${params.storeId}/products`);
       toast.success('Product deleted.');
-    } catch (error) {
-      toast.error('Something went wrong');
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        toast.error('Make sure you removed all orders using this product first.');
+      } else {
+        toast.error('Something went wrong');
+      }
     } finally {
       setLoading(false);
       setOpen(false);
