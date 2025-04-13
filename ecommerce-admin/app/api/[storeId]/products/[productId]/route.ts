@@ -83,7 +83,6 @@ export async function PATCH(
 ) {
   try {
     const { userId } = auth();
-
     const body = await req.json();
 
     const {
@@ -129,47 +128,55 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
-    // First, delete existing images
-    await prismadb.image.deleteMany({
-      where: {
-        productId: params.productId
-      }
-    });
+    // Create the update data object
+    const updateData: any = {};
 
-    // Then update the product with new data
+    // Only include fields that are present in the request body
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
+    if (colorId !== undefined) updateData.colorId = colorId;
+    if (sizeId !== undefined) updateData.sizeId = sizeId;
+    if (costPerItem !== undefined) updateData.costPerItem = costPerItem;
+    if (profitMargin !== undefined) updateData.profitMargin = profitMargin;
+    if (taxes !== undefined) updateData.taxes = taxes;
+    if (sku !== undefined) updateData.sku = sku;
+    if (stockQuantity !== undefined) updateData.stockQuantity = stockQuantity;
+    if (sellWhenOutOfStock !== undefined) updateData.sellWhenOutOfStock = sellWhenOutOfStock;
+    if (requiresShipping !== undefined) updateData.requiresShipping = requiresShipping;
+    if (weight !== undefined) updateData.weight = weight;
+    if (weightUnit !== undefined) updateData.weightUnit = weightUnit;
+    if (length !== undefined) updateData.length = length;
+    if (width !== undefined) updateData.width = width;
+    if (height !== undefined) updateData.height = height;
+    if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
+    if (isArchived !== undefined) updateData.isArchived = isArchived;
+
+    // Handle images separately only if they are provided
+    if (images) {
+      // First, delete existing images
+      await prismadb.image.deleteMany({
+        where: {
+          productId: params.productId
+        }
+      });
+
+      // Add images to update data
+      updateData.images = {
+        createMany: {
+          data: images.map((image: { url: string }) => ({
+            url: image.url
+          }))
+        }
+      };
+    }
+
     const product = await prismadb.product.update({
       where: {
         id: params.productId,
       },
-      data: {
-        name,
-        description,
-        price,
-        categoryId,
-        colorId,
-        sizeId,
-        costPerItem,
-        profitMargin,
-        taxes,
-        sku,
-        stockQuantity,
-        sellWhenOutOfStock,
-        requiresShipping,
-        weight,
-        weightUnit,
-        length,
-        width,
-        height,
-        images: {
-          createMany: {
-            data: images.map((image: { url: string }) => ({
-              url: image.url
-            }))
-          }
-        },
-        isFeatured,
-        isArchived,
-      },
+      data: updateData,
     });
 
     return NextResponse.json(product);
