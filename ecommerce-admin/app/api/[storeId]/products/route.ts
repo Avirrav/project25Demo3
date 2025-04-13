@@ -83,16 +83,14 @@ export async function POST(
       return new NextResponse('Store id is required', { status: 400 });
     }
 
-    const storByUserId = await prismadb.store.findFirst({
+    const storeByUserId = await prismadb.store.findFirst({
       where: {
         id: params.storeId,
         userId,
       },
     });
 
-    
-
-    if (!storByUserId) {
+    if (!storeByUserId) {
       return new NextResponse('Unauthorized', { status: 405 });
     }
 
@@ -100,19 +98,19 @@ export async function POST(
       data: {
         name,
         description,
-        price,
-        costPerItem,
+        price: typeof price === 'string' ? parseFloat(price) : price,
+        costPerItem: typeof costPerItem === 'string' ? parseFloat(costPerItem) : costPerItem,
         profitMargin: profitMargin || 0,
         taxes,
         sku,
         stockQuantity,
         sellWhenOutOfStock: sellWhenOutOfStock || false,
         requiresShipping: requiresShipping ?? true,
-        weight,
+        weight: weight ? parseFloat(String(weight)) : null,
         weightUnit,
-        length,
-        width,
-        height,
+        length: length ? parseFloat(String(length)) : null,
+        width: width ? parseFloat(String(width)) : null,
+        height: height ? parseFloat(String(height)) : null,
         categoryId,
         colorId,
         sizeId,
