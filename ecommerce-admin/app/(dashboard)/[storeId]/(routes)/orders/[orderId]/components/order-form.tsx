@@ -127,7 +127,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         }
       }
 
-      const quantities = {};
+      const quantities: Record<string, number> = {};
       initialData.orderItems.forEach(item => {
         quantities[item.productId] = item.quantity;
       });
