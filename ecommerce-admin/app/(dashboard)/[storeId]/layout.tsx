@@ -29,7 +29,9 @@ export default async function DashboardLayout({
   return (
     <>
       <Navbar />
-      {children}
+      <div className="pt-16"> {/* Add padding to account for fixed navbar */}
+        {children}
+      </div>
       <Footer />
     </>
   );

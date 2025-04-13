@@ -53,9 +53,17 @@ export async function DELETE(
     });
 
     if (!storByUserId) {
-      return new NextResponse('Unautorized', { status: 405 });
+      return new NextResponse('Unauthorized', { status: 405 });
     }
 
+    // First delete all related order items
+    await prismadb.orderItem.deleteMany({
+      where: {
+        productId: params.productId,
+      },
+    });
+
+    // Then delete the product
     const product = await prismadb.product.delete({
       where: {
         id: params.productId,
