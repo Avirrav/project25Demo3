@@ -54,7 +54,6 @@ model Order {
   address         String    @default("")
   paymentStatus   String    @default("pending")
   paymentMethod   String    @default("cash")
-  amountPaid      Decimal   @default(0)
   orderStatus     String    @default("draft")
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

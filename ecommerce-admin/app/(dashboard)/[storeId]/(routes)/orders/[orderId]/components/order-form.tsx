@@ -32,7 +32,6 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
-// Updated form schema to make some fields optional based on customer type
 const formSchema = z.object({
   customerType: z.enum(['existing', 'guest']),
   customerId: z.string().optional(),
@@ -49,22 +48,8 @@ const formSchema = z.object({
   quantities: z.record(z.string(), z.number().min(1)),
   paymentStatus: z.enum(['paid', 'pending', 'partial']),
   paymentMethod: z.enum(['cash', 'credit_card', 'upi', 'bank_transfer', 'other']),
-  amountPaid: z.number().min(0),
   orderStatus: z.enum(['draft', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned']),
   isPaid: z.boolean().default(false),
-}).refine((data) => {
-  // Validate that if customerType is 'guest', fullName is provided
-  if (data.customerType === 'guest' && !data.fullName) {
-    return false;
-  }
-  // Validate that if customerType is 'existing', customerId is provided
-  if (data.customerType === 'existing' && !data.customerId) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Required fields are missing",
-  path: ["customerType"]
 });
 
 type OrderFormValues = z.infer<typeof formSchema>;
@@ -163,7 +148,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         quantities,
         paymentStatus: initialData.paymentStatus as any,
         paymentMethod: initialData.paymentMethod as any,
-        amountPaid: Number(initialData.amountPaid),
         orderStatus: initialData.orderStatus as any,
         isPaid: initialData.isPaid
       };
@@ -184,7 +168,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       quantities: {},
       paymentStatus: 'pending' as const,
       paymentMethod: 'cash' as const,
-      amountPaid: 0,
       orderStatus: 'draft' as const,
       isPaid: false
     };
@@ -207,19 +190,13 @@ export const OrderForm: React.FC<OrderFormProps> = ({
     }, 0);
   };
 
-  // Update amount paid when products or quantities change
+  // Update payment status when total price changes
   useEffect(() => {
     const totalPrice = calculateTotalPrice();
-    form.setValue('amountPaid', totalPrice);
-  }, [form.watch('productIds'), form.watch('quantities')]);
-
-  // Watch for payment status changes
-  useEffect(() => {
-    const paymentStatus = form.watch('paymentStatus');
-    if (paymentStatus === 'paid') {
+    if (form.watch('paymentStatus') === 'paid') {
       form.setValue('isPaid', true);
     }
-  }, [form.watch('paymentStatus')]);
+  }, [form.watch('productIds'), form.watch('quantities'), form.watch('paymentStatus')]);
 
   // Handle customer selection
   const handleCustomerSelect = (customerId: string) => {
@@ -255,10 +232,12 @@ export const OrderForm: React.FC<OrderFormProps> = ({
         country: data.country
       });
 
+      const totalPrice = calculateTotalPrice();
+
       const submitData = {
         ...data,
         shippingAddress,
-        // Ensure these fields are included
+        totalPrice,
         phone: data.phone,
         email: data.email || '',
         address: data.addressLine1, // Store the primary address
@@ -709,27 +688,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
 
             <FormField
               control={form.control}
-              name="amountPaid"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Amount Paid</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number"
-                      disabled={true} 
-                      placeholder="0.00" 
-                      {...field}
-                      onChange={e => field.onChange(parseFloat(e.target.value))}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Order Status */}
-            <FormField
-              control={form.control}
               name="orderStatus"
               render={({ field }) => (
                 <FormItem>
@@ -778,6 +736,11 @@ export const OrderForm: React.FC<OrderFormProps> = ({
                 </FormItem>
               )}
             />
+
+            <div className="flex items-center space-x-2">
+              <FormLabel>Total Price:</FormLabel>
+              <span className="text-lg font-bold">${calculateTotalPrice().toFixed(2)}</span>
+            </div>
           </div>
           <Button disabled={loading} className="ml-auto" type="submit">
             {action}
@@ -786,4 +749,4 @@ export const OrderForm: React.FC<OrderFormProps> = ({
       </Form>
     </>
   );
-}; 
+};

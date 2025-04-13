@@ -27,7 +27,7 @@ export async function POST(
       quantities,
       paymentStatus,
       paymentMethod,
-      amountPaid,
+      totalPrice,
       orderStatus,
       isPaid
     } = body;
@@ -83,10 +83,9 @@ export async function POST(
         customerId: finalCustomerId,
         phone,
         email,
-        address: addressLine1, // Store the primary address in the order
+        address: addressLine1, // Store the primary address
         paymentStatus,
         paymentMethod,
-        amountPaid,
         orderStatus,
         isPaid,
         orderItems: {
