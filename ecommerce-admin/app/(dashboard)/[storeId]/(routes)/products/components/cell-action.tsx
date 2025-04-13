@@ -33,11 +33,10 @@ export const CellAction = ({ data }: CellActionProps) => {
     toast.success('Product id copied to clipboard');
   };
 
-  const onArchive = async () => {
+  const onArchiveToggle = async () => {
     try {
       setLoading(true);
       await axios.patch(`/api/${params.storeId}/products/${data.id}`, {
-        ...data,
         isArchived: !data.isArchived
       });
       router.refresh();
@@ -100,7 +99,7 @@ export const CellAction = ({ data }: CellActionProps) => {
             <Edit className='mr-2 h-4 w-4' />
             Update
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onArchive}>
+          <DropdownMenuItem onClick={onArchiveToggle} disabled={loading}>
             {data.isArchived ? (
               <>
                 <ArchiveRestore className='mr-2 h-4 w-4' />
