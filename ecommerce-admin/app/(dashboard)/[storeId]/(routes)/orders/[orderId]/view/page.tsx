@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import prismadb from '@/lib/prismadb';
+import { formatter } from '@/lib/utils';
 import { OrderView } from './components/order-view';
 
 const OrderViewPage = async ({
@@ -25,11 +26,16 @@ const OrderViewPage = async ({
     return null;
   }
 
+  // Calculate total price from order items
+  const totalPrice = order.orderItems.reduce((total, item) => {
+    return total + (item.product.price.toNumber() * item.quantity);
+  }, 0);
+
   const formattedOrder = {
     ...order,
     createdAt: format(order.createdAt, 'MMMM do, yyyy'),
     updatedAt: format(order.updatedAt, 'MMMM do, yyyy'),
-    amountPaid: order.amountPaid.toNumber(),
+    totalAmount: totalPrice
   };
 
   return (

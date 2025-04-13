@@ -36,7 +36,7 @@ export const OrderView: React.FC<OrderViewProps> = ({ data }) => {
     doc.text(`Order Status: ${data.orderStatus}`, 20, y); y += lineHeight;
     doc.text(`Payment Status: ${data.paymentStatus}`, 20, y); y += lineHeight;
     doc.text(`Payment Method: ${data.paymentMethod}`, 20, y); y += lineHeight;
-    doc.text(`Amount Paid: ${formatter.format(data.amountPaid)}`, 20, y); y += lineHeight;
+    doc.text(`Total Amount: ${formatter.format(data.totalAmount)}`, 20, y); y += lineHeight;
     doc.text(`Is Paid: ${data.isPaid ? 'Yes' : 'No'}`, 20, y); y += lineHeight;
     
     // Products
@@ -122,8 +122,8 @@ export const OrderView: React.FC<OrderViewProps> = ({ data }) => {
               {data.paymentMethod}
             </div>
             <div>
-              <span className="font-semibold">Amount Paid: </span>
-              {formatter.format(data.amountPaid)}
+              <span className="font-semibold">Total Amount: </span>
+              {formatter.format(data.totalAmount)}
             </div>
             <div>
               <span className="font-semibold">Is Paid: </span>

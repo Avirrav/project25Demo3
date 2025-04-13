@@ -3,8 +3,8 @@ import { format } from 'date-fns';
 import prismadb from '@/lib/prismadb';
 import { formatter } from '@/lib/utils';
 
+import { OrdersClient } from './components/client';
 import { OrderColumn } from './components/columns';
-import { OrderClient } from './components/client';
 
 const OrdersPage = async ({ params }: { params: { storeId: string } }) => {
   const orders = await prismadb.order.findMany({
@@ -32,7 +32,7 @@ const OrdersPage = async ({ params }: { params: { storeId: string } }) => {
       .join(', '),
     totalPrice: formatter.format(
       item.orderItems.reduce((total, item) => {
-        return total + Number(item.product.price);
+        return total + (Number(item.product.price) * item.quantity);
       }, 0)
     ),
     isPaid: item.isPaid,
@@ -44,7 +44,7 @@ const OrdersPage = async ({ params }: { params: { storeId: string } }) => {
   return (
     <div className='flex-col'>
       <div className='flex-1 space-y-4 p-8 pt-6'>
-        <OrderClient data={formattedOrders} />
+        <OrdersClient data={formattedOrders} />
       </div>
     </div>
   );
