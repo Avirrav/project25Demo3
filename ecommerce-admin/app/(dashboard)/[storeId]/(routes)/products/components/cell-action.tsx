@@ -51,11 +51,26 @@ export const CellAction = ({ data }: CellActionProps) => {
   const onDelete = async () => {
     try {
       setLoading(true);
+      
+      // First check if the product has any orders
+      const response = await axios.get(`/api/${params.storeId}/products/${data.id}/check-orders`);
+      const { hasOrders } = response.data;
+
+      if (hasOrders) {
+        toast.error('Cannot delete product with existing orders. Instead Archive the Product to hide it.');
+        setOpen(false);
+        return;
+      }
+
       await axios.delete(`/api/${params.storeId}/products/${data.id}`);
       router.refresh();
       toast.success('Product deleted.');
-    } catch (error) {
-      toast.error('Something went wrong');
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        toast.error('Cannot delete product with existing orders.');
+      } else {
+        toast.error('Something went wrong');
+      }
     } finally {
       setLoading(false);
       setOpen(false);
