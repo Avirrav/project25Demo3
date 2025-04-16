@@ -11,7 +11,7 @@ export async function PATCH(
     const { userId } = auth();
     const body = await req.json();
 
-    const { name } = body;
+    const { name, username, apiUrl, homeBillboardId } = body;
 
     if (!userId) {
       return new NextResponse('Unauthenticated', { status: 403 });
@@ -25,6 +25,22 @@ export async function PATCH(
       return new NextResponse('Store id is required', { status: 400 });
     }
 
+    // Check if username is already taken by another store
+    if (username) {
+      const existingStore = await prismadb.store.findFirst({
+        where: {
+          username: username,
+          NOT: {
+            id: params.storeId
+          }
+        }
+      });
+
+      if (existingStore) {
+        return new NextResponse('Username is already taken', { status: 400 });
+      }
+    }
+
     const store = await prismadb.store.updateMany({
       where: {
         id: params.storeId,
@@ -32,6 +48,9 @@ export async function PATCH(
       },
       data: {
         name,
+        username,
+        apiUrl,
+        homeBillboardId: homeBillboardId || null,
       },
     });
 

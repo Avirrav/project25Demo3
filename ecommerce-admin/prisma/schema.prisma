@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,6 +12,10 @@ model Store {
   id              String    @id @default(uuid())
   name            String
   userId          String
+  username        String?   @unique
+  apiUrl          String?
+  homeBillboardId String?
+  homeBillboard   Billboard? @relation("StoreToHomeBillboard", fields: [homeBillboardId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   billboards      Billboard[] @relation("StoreToBillboard")
   categories      Category[] @relation("StoreToCategory")
   products        Product[]  @relation("StoreToProduct")
@@ -24,6 +25,8 @@ model Store {
   customers       Customer[]  @relation("StoreToCustomer")
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
+
+  @@index([homeBillboardId])
 }
 
 model Customer {
@@ -81,6 +84,7 @@ model Billboard {
   label       String
   imageUrl    String
   categories  Category[]
+  storesAsHome Store[] @relation("StoreToHomeBillboard")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
